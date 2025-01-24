@@ -10,9 +10,13 @@ resource "google_compute_instance" "vm_instance" {
     machine_type = var.machine_type
     zone = var.zone
 
+    tags = ["http-server"]
+
     boot_disk {
       initialize_params {
-        image = "Ubuntu 22.04 LTS"
+        image = "ubuntu-os-cloud/ubuntu-2204-lts"
+        size = 50
+        type = "pd-ssd"
       }
     }
 
@@ -26,32 +30,22 @@ resource "google_compute_instance" "vm_instance" {
     metadata = {
       startup-script = <<-EOT
       #!/bin/bash
+      set -e
       sudo apt-get update
       sudo apt-get install -y ca-certificates curl
       sudo install -m 0755 -d /etc/apt/keyrings
-      sudo curl -fsSL https://nginx.org/keys/nginx_signing.key -o /etc/apt/keyrings/nginx.asc
-      sudo chmod a+r /etc/apt/keyrings/nginx.asc
+      sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      sudo chmod a+r /etc/apt/keyrings/docker.asc
 
+      # Add the repository to Apt sources:
       echo \
-        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/nginx.asc] http://nginx.org/packages/ubuntu \
-        $(. /etc/os-release && echo "$VERSION_CODENAME") nginx" | \
-        sudo tee /etc/apt/sources.list.d/nginx.list > /dev/null
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
       sudo apt-get update
 
-      sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-compose -y
+      # Install Docker
+      sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-compose
       EOT
     }
-}
-
-resource "google_compute_firewall" "default-allow-http" {
-    name = "default-allow-http"
-    network = "default"
-
-    allow {
-      protocol = "tcp"
-      ports = ["80"]
-    }
-
-    source_ranges = ["0.0.0.0/0"]
-    target_tags = ["http-server"]
 }
